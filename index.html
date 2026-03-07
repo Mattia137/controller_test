@@ -12,14 +12,14 @@
             margin: 0; background: #000; color: #fff; 
             font-family: 'Fragment Mono', monospace; overflow: hidden;
             user-select: none; -webkit-tap-highlight-color: transparent;
+            touch-action: none;
         }
         #energy-canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; }
         
-        /* UI LAYERING */
         .ui-layer { position: absolute; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
         .interactive { pointer-events: all; }
 
-        /* RESET BUTTON - UP CENTERED WITH OUTLINE */
+        /* RESET BUTTON */
         #reset-container { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); }
         .reset-btn {
             font-size: 10px; letter-spacing: 4px; border: 1px solid rgba(255, 255, 255, 0.3);
@@ -28,7 +28,7 @@
         }
         .reset-btn:active { background: #fff; color: #000; }
 
-        /* ACTION SQUARE - ABOVE LEFT JOYSTICK */
+        /* ACTION SQUARE */
         #action-container {
             position: absolute; bottom: 45%; left: 25%; transform: translateX(-50%);
             display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -41,7 +41,7 @@
         .action-square:active { background: #fff; }
         .label-small { font-size: 7px; opacity: 0.3; letter-spacing: 2px; text-transform: uppercase; }
 
-        /* SLIDER - BOTTOM CENTERED */
+        /* SLIDER */
         #slider-container {
             position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
             width: 60%; display: flex; flex-direction: column; align-items: center; gap: 10px;
@@ -61,15 +61,20 @@
             border: 1px solid rgba(255,255,255,0.8) !important;
             transition: background 0.1s, box-shadow 0.1s;
         }
-
-        /* Active Solid State */
         .nipple.active .front { 
             background: #fff !important; 
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.6); 
         }
+
+        #status-indicator {
+            position: absolute; top: 10px; left: 10px; font-size: 6px; letter-spacing: 1px;
+            opacity: 0.5; color: #ff0000;
+        }
+        #status-indicator.connected { color: #00ff00; }
     </style>
 </head>
 <body>
+    <div id="status-indicator">DISCONNECTED</div>
     <canvas id="energy-canvas"></canvas>
     
     <div class="ui-layer">
@@ -96,35 +101,33 @@
     <script>
         const canvas = document.getElementById('energy-canvas');
         const ctx = canvas.getContext('2d');
+        const statusInd = document.getElementById('status-indicator');
         let particles = [];
         let activeTouches = {};
         let time = 0;
 
+        // ENERGY VISUALS
         class EnergyParticle {
             constructor(tx, ty) {
                 const angle = Math.random() * Math.PI * 2;
-                const radius = 60 + Math.random() * 100; 
+                const radius = 40 + Math.random() * 40; 
                 this.x = tx + Math.cos(angle) * radius;
                 this.y = ty + Math.sin(angle) * radius;
                 this.tx = tx; this.ty = ty;
                 this.size = Math.random() * 0.3 + 0.1;
-                this.speed = 0.015 + Math.random() * 0.02; 
+                this.speed = 0.02 + Math.random() * 0.03; 
                 this.life = 1.0;
                 this.noiseOffset = Math.random() * 1000;
             }
             update() {
-                this.x += (this.tx - this.x) * this.speed + Math.sin(time * 3 + this.noiseOffset) * 0.7;
-                this.y += (this.ty - this.y) * this.speed + Math.cos(time * 3 + this.noiseOffset) * 0.7;
-                this.life -= 0.015;
+                this.x += (this.tx - this.x) * this.speed + Math.sin(time * 3 + this.noiseOffset) * 0.5;
+                this.y += (this.ty - this.y) * this.speed + Math.cos(time * 3 + this.noiseOffset) * 0.5;
+                this.life -= 0.02;
             }
             draw() {
-                const opacity = this.life * 0.4;
-                const bloomSize = this.size * 50;
-                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, bloomSize);
-                gradient.addColorStop(0, `rgba(255, 255, 255, ${opacity})`);
-                gradient.addColorStop(0.1, `rgba(255, 255, 255, ${opacity * 0.1})`);
-                gradient.addColorStop(1, `rgba(255, 255, 255, 0)`);
-                ctx.fillStyle = gradient;
+                const opacity = this.life * 0.3;
+                const bloomSize = this.size * 40;
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, bloomSize, 0, Math.PI * 2);
                 ctx.fill();
@@ -133,35 +136,48 @@
 
         function animate() {
             time += 0.01;
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.globalCompositeOperation = 'lighter';
             
             Object.keys(activeTouches).forEach(key => {
                 const t = activeTouches[key];
                 if (t) {
-                    for(let i = 0; i < 6; i++) {
-                        particles.push(new EnergyParticle(t.x, t.y));
-                    }
+                    for(let i = 0; i < 3; i++) particles.push(new EnergyParticle(t.x, t.y));
                 }
             });
 
-            particles.forEach((p, i) => {
-                p.update(); p.draw();
-                if (p.life <= 0) particles.splice(i, 1);
-            });
-            ctx.globalCompositeOperation = 'source-over';
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                particles[i].draw();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
             requestAnimationFrame(animate);
         }
 
+        // PEER CONNECTION
         const urlParams = new URLSearchParams(window.location.search);
         const desktopId = urlParams.get('id');
         const peer = new Peer();
         let conn;
 
         peer.on('open', (id) => {
-            if (desktopId) conn = peer.connect(desktopId);
+            if (desktopId) {
+                conn = peer.connect(desktopId);
+                setupConnListeners();
+            }
         });
+
+        function setupConnListeners() {
+            conn.on('open', () => {
+                statusInd.innerText = 'LINK_STABLE';
+                statusInd.classList.add('connected');
+                if (navigator.vibrate) navigator.vibrate([30, 30, 30]);
+            });
+            conn.on('close', () => {
+                statusInd.innerText = 'LINK_LOST';
+                statusInd.classList.remove('connected');
+            });
+        }
 
         function sendCmd(cmd) {
             if (conn && conn.open) conn.send({ type: 'BUTTON', action: cmd });
@@ -169,29 +185,46 @@
         }
 
         function sendSlider(val) {
-            if (conn && conn.open) conn.send({ type: 'SLIDE', value: val / 100 });
+            if (conn && conn.open) conn.send({ type: 'SLIDE', value: parseFloat(val) / 100 });
         }
 
-        const options = { mode: 'static', size: 100 };
+        // JOYSTICKS
+        const options = { mode: 'static', size: 100, threshold: 0.1 };
         const leftJoy = nipplejs.create({ zone: document.getElementById('left-zone'), ...options, position: { bottom: '25%', left: '25%'} });
         const rightJoy = nipplejs.create({ zone: document.getElementById('right-zone'), ...options, position: { bottom: '25%', right: '25%'} });
 
         function setupJoy(joy, type) {
             joy.on('start', () => {
-                joy.get().el.classList.add('active');
+                const el = joy.get().el;
+                if(el) el.classList.add('active');
             });
+
             joy.on('move', (evt, data) => {
+                // Track visual position for particles
                 const pos = data.instance.ui.front.getBoundingClientRect();
                 activeTouches[type] = { x: pos.left + pos.width/2, y: pos.top + pos.height/2 };
-                if (conn && conn.open) conn.send({ type: type, x: data.vector.x, y: data.vector.y, force: data.force });
+                
+                if (conn && conn.open) {
+                    // Normalize NippleJS Y (negative is up) to 3D Y (positive is forward)
+                    conn.send({ 
+                        type: type, 
+                        x: data.vector.x, 
+                        y: -data.vector.y, 
+                        force: data.force 
+                    });
+                }
             });
+
             joy.on('end', () => {
-                joy.get().el.classList.remove('active');
+                const el = joy.get().el;
+                if(el) el.classList.remove('active');
                 delete activeTouches[type];
                 if (conn && conn.open) conn.send({ type: type, x: 0, y: 0, force: 0 });
             });
         }
-        setupJoy(leftJoy, 'MOVE'); setupJoy(rightJoy, 'ROTATE');
+
+        setupJoy(leftJoy, 'MOVE'); 
+        setupJoy(rightJoy, 'ROTATE');
 
         window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
         canvas.width = window.innerWidth; canvas.height = window.innerHeight;
