@@ -3,161 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>REMOTE // DEBUG</title>
+    <title>HYPEROBJECT // REMOTE</title>
     <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #000; color: #fff; font-family: 'Fragment Mono', monospace; font-size: 11px; padding: 20px; overflow-y: auto; }
-        h1 { font-size: 10px; letter-spacing: 4px; opacity: 0.4; margin-bottom: 20px; }
-        #log { display: flex; flex-direction: column; gap: 6px; }
-        .entry { display: flex; gap: 10px; align-items: flex-start; line-height: 1.5; }
-        .dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-        .ok   .dot { background: #00ff88; }
-        .warn .dot { background: #ffaa00; }
-        .err  .dot { background: #ff3a3a; }
-        .info .dot { background: #4488ff; }
-        .msg { opacity: 0.85; word-break: break-all; }
-        #test-btn { margin-top: 30px; width: 100%; padding: 14px; background: none; border: 1px solid rgba(255,255,255,0.3); color: #fff; font-family: 'Fragment Mono', monospace; font-size: 10px; letter-spacing: 3px; cursor: pointer; }
-        #test-btn:active { background: #fff; color: #000; }
-        #id-display { margin-top: 16px; font-size: 9px; opacity: 0.4; letter-spacing: 2px; word-break: break-all; }
+        body { margin: 0; background: #000; color: #fff; font-family: 'Fragment Mono', monospace; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+        #energy-canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; }
+        .ui-layer { position: absolute; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
+        .interactive { pointer-events: all; }
+        #reset-container { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); }
+        .reset-btn { font-size: 10px; letter-spacing: 4px; border: 1px solid rgba(255, 255, 255, 0.3); background: none; color: #fff; font-family: 'Fragment Mono', monospace; padding: 8px 20px; cursor: pointer; transition: all 0.2s; }
+        .reset-btn:active { background: #fff; color: #000; }
+        #action-container { position: absolute; bottom: 45%; left: 25%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .action-square { width: 40px; height: 40px; border: 1px solid #fff; background: transparent; transition: background 0.1s; cursor: pointer; }
+        .action-square:active { background: #fff; }
+        .label-small { font-size: 7px; opacity: 0.3; letter-spacing: 2px; text-transform: uppercase; }
+        #slider-container { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 60%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: rgba(255,255,255,0.2); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; background: #fff; margin-top: -6px; border-radius: 0; }
+        .zones { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; z-index: 10; }
+        .nipple .back { background: transparent !important; border: 0.5px solid rgba(255,255,255,0.1) !important; }
+        .nipple .front { background: transparent !important; border: 1px solid rgba(255,255,255,0.8) !important; transition: background 0.1s, box-shadow 0.1s; }
+        .nipple.active .front { background: #fff !important; box-shadow: 0 0 20px rgba(255, 255, 255, 0.6); }
+        #status-bar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; z-index: 30; }
+        #status-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff3a3a; transition: background 0.4s; }
+        #status-dot.linking { background: #ffaa00; animation: blink 0.6s infinite; }
+        #status-dot.linked  { background: #00ff88; animation: none; }
+        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+        #status-text { font-size: 7px; letter-spacing: 3px; opacity: 0.5; text-transform: uppercase; }
     </style>
 </head>
 <body>
-    <h1>HYPEROBJECT // DIAGNOSTIC</h1>
-    <div id="log"></div>
-    <button id="test-btn" style="display:none" onclick="sendTest()">SEND TEST PACKET</button>
-    <div id="id-display"></div>
+    <canvas id="energy-canvas"></canvas>
+    <div id="status-bar"><div id="status-dot"></div><div id="status-text">SEARCHING</div></div>
+    <div class="ui-layer">
+        <div id="reset-container" class="interactive"><button class="reset-btn" onclick="sendCmd('RESET')">RESET</button></div>
+        <div id="action-container" class="interactive"><div class="action-square" onclick="sendCmd('ACTION')"></div><div class="label-small">EXECUTE</div></div>
+        <div id="slider-container" class="interactive"><div class="label-small" style="opacity: 0.2">SEQUENCE_MAP</div><input type="range" min="0" max="100" value="0" oninput="sendSlider(this.value)"></div>
+    </div>
+    <div class="zones"><div id="left-zone"></div><div id="right-zone"></div></div>
 
-<script>
-    const logEl = document.getElementById('log');
+    <script>
+        const canvas = document.getElementById('energy-canvas'); const ctx = canvas.getContext('2d');
+        let particles = [], activeTouches = {}, time = 0;
 
-    function log(msg, type = 'info') {
-        const entry = document.createElement('div');
-        entry.className = `entry ${type}`;
-        entry.innerHTML = `<div class="dot"></div><div class="msg">${msg}</div>`;
-        logEl.appendChild(entry);
-        window.scrollTo(0, document.body.scrollHeight);
-    }
-
-    // ── 1. Check URL param ────────────────────────────────────────────────
-    const urlParams = new URLSearchParams(window.location.search);
-    const desktopId = urlParams.get('id');
-    if (!desktopId) {
-        log('NO ?id= PARAM IN URL — open this page via the QR code from the desktop', 'err');
-    } else {
-        log(`TARGET ID: ${desktopId}`, 'info');
-    }
-
-    // ── 2. Check localStorage (Safari Private) ────────────────────────────
-    try {
-        localStorage.setItem('__test__', '1');
-        localStorage.removeItem('__test__');
-        log('localStorage: OK', 'ok');
-    } catch(e) {
-        log(`localStorage BLOCKED (Safari Private mode?) — applying polyfill`, 'warn');
-        const mem = {};
-        Object.defineProperty(window, 'localStorage', {
-            value: {
-                getItem: k => mem[k] ?? null,
-                setItem: (k, v) => { mem[k] = v; },
-                removeItem: k => delete mem[k],
-                clear: () => Object.keys(mem).forEach(k => delete mem[k])
+        class EnergyParticle {
+            constructor(tx, ty) {
+                const angle = Math.random() * Math.PI * 2; const radius = 60 + Math.random() * 100;
+                this.x = tx + Math.cos(angle) * radius; this.y = ty + Math.sin(angle) * radius;
+                this.tx = tx; this.ty = ty; this.size = Math.random() * 0.3 + 0.1;
+                this.speed = 0.015 + Math.random() * 0.02; this.life = 1.0; this.noiseOffset = Math.random() * 1000;
             }
-        });
-    }
+            update() { this.x += (this.tx - this.x) * this.speed + Math.sin(time * 3 + this.noiseOffset) * 0.7; this.y += (this.ty - this.y) * this.speed + Math.cos(time * 3 + this.noiseOffset) * 0.7; this.life -= 0.015; }
+            draw() { const opacity = this.life * 0.4; const bloomSize = this.size * 50; const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, bloomSize); gradient.addColorStop(0, `rgba(255,255,255,${opacity})`); gradient.addColorStop(0.1, `rgba(255,255,255,${opacity * 0.1})`); gradient.addColorStop(1, `rgba(255,255,255,0)`); ctx.fillStyle = gradient; ctx.beginPath(); ctx.arc(this.x, this.y, bloomSize, 0, Math.PI * 2); ctx.fill(); }
+        }
 
-    // ── 3. Check WebRTC support ───────────────────────────────────────────
-    if (window.RTCPeerConnection) {
-        log('WebRTC: supported', 'ok');
-    } else {
-        log('WebRTC: NOT SUPPORTED in this browser — try Chrome or regular Safari', 'err');
-    }
+        function animate() {
+            time += 0.01; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.globalCompositeOperation = 'lighter';
+            Object.keys(activeTouches).forEach(key => { const t = activeTouches[key]; if (t) { for (let i = 0; i < 6; i++) particles.push(new EnergyParticle(t.x, t.y)); } });
+            particles.forEach((p, i) => { p.update(); p.draw(); if (p.life <= 0) particles.splice(i, 1); });
+            ctx.globalCompositeOperation = 'source-over'; requestAnimationFrame(animate);
+        }
 
-    // ── 4. Init PeerJS ────────────────────────────────────────────────────
-    log('Initializing PeerJS v1.5.4...', 'info');
+        const statusDot = document.getElementById('status-dot'); const statusText = document.getElementById('status-text');
+        function setStatus(state, label) { statusDot.className = state; statusText.textContent = label; }
 
-    let peer, conn;
+        const urlParams = new URLSearchParams(window.location.search);
+        const desktopId = urlParams.get('id');
+        
+        // Safari Private Browsing blocks localStorage — PeerJS needs it for ID storage.
+        // This polyfill makes it safe by falling back to a memory-only store.
+        try { localStorage.setItem('__test__', '1'); localStorage.removeItem('__test__'); }
+        catch(e) {
+            const mem = {};
+            Object.defineProperty(window, 'localStorage', {
+                value: { getItem: k => mem[k]??null, setItem: (k,v) => { mem[k]=v; }, removeItem: k => delete mem[k], clear: () => Object.keys(mem).forEach(k=>delete mem[k]) }
+            });
+        }
 
-    try {
-        peer = new Peer({
+        const peer = new Peer({
             config: {
-                iceServers: [
+                'iceServers': [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
                     { urls: 'stun:stun.cloudflare.com:3478' }
                 ]
-            },
-            debug: 0
+            }
         });
-    } catch(e) {
-        log(`PeerJS constructor threw: ${e.message}`, 'err');
-    }
+        
+        let conn;
 
-    peer.on('open', (id) => {
-        log(`PeerJS OPEN — my peer ID: ${id}`, 'ok');
-        document.getElementById('id-display').textContent = `MY_ID: ${id}`;
+        peer.on('open', () => {
+            if (desktopId) {
+                setStatus('linking', 'LINKING');
+                
+                // THE FIX: Bypassing BinaryPack serialization so Safari doesn't crash on handshake
+                conn = peer.connect(desktopId, { serialization: 'json' });
 
-        if (!desktopId) return;
-
-        log(`Connecting to desktop: ${desktopId}`, 'info');
-        log('Using serialization: json', 'info');
-
-        conn = peer.connect(desktopId, { serialization: 'json', reliable: true });
-
-        log('Connection object created — waiting for data channel...', 'info');
-
-        conn.on('open', () => {
-            log('DATA CHANNEL OPEN — connection fully established ✓', 'ok');
-            document.getElementById('test-btn').style.display = 'block';
+                conn.on('open', () => { setStatus('linked', 'LINKED'); });
+                conn.on('close', () => { setStatus('', 'DISCONNECTED'); conn = null; });
+                conn.on('error', (err) => { setStatus('', 'ERROR'); console.error('Conn error:', err); });
+            } else { setStatus('', 'NO_ID'); }
         });
 
-        conn.on('error', (err) => {
-            log(`conn.on(error): type=${err.type} msg=${err.message}`, 'err');
+        peer.on('error', (err) => { 
+            setStatus('', err.type || 'PEER_ERR'); 
+            console.error('Peer error type:', err.type, err); 
         });
 
-        conn.on('close', () => {
-            log('Connection closed by remote end', 'warn');
-        });
+        function sendCmd(cmd) { if (conn && conn.open) { conn.send({ type: 'BUTTON', action: cmd }); if (navigator.vibrate) navigator.vibrate(25); } }
+        function sendSlider(val) { if (conn && conn.open) conn.send({ type: 'SLIDE', value: parseFloat(val) / 100 }); }
 
-        conn.on('iceStateChanged', (state) => {
-            log(`ICE state: ${state}`, state === 'connected' ? 'ok' : state === 'failed' ? 'err' : 'warn');
-        });
-    });
+        const options = { mode: 'static', size: 100 };
+        const leftJoy = nipplejs.create({ zone: document.getElementById('left-zone'),  ...options, position: { bottom: '25%', left:  '25%' } });
+        const rightJoy = nipplejs.create({ zone: document.getElementById('right-zone'), ...options, position: { bottom: '25%', right: '25%' } });
 
-    peer.on('disconnected', () => {
-        log('PeerJS: disconnected from signaling server', 'warn');
-        log('Attempting reconnect...', 'info');
-        peer.reconnect();
-    });
-
-    peer.on('error', (err) => {
-        log(`peer.on(error): type="${err.type}"`, 'err');
-        log(`message: ${err.message}`, 'err');
-
-        // Translate common errors
-        const help = {
-            'peer-unavailable':  '→ Desktop peer ID not found. Is the desktop open and on REMOTE mode? Try refreshing desktop first.',
-            'network':           '→ Cannot reach PeerJS signaling server. Check internet connection on phone.',
-            'server-error':      '→ PeerJS cloud server returned an error. Try again in 30 seconds.',
-            'browser-incompatible': '→ This browser does not support WebRTC. Use regular Safari or Chrome.',
-            'unavailable-id':    '→ ID conflict. Refresh the desktop page to get a new ID.',
-        };
-        if (help[err.type]) log(help[err.type], 'warn');
-    });
-
-    function sendTest() {
-        if (conn && conn.open) {
-            conn.send({ type: 'MOVE', x: 0.5, y: 0.5, force: 1 });
-            log('Test packet sent → MOVE {x:0.5, y:0.5, force:1}', 'ok');
-            setTimeout(() => {
-                conn.send({ type: 'MOVE', x: 0, y: 0, force: 0 });
-                log('Stop packet sent → MOVE {force:0}', 'ok');
-            }, 500);
-        } else {
-            log('Cannot send — connection not open', 'err');
+        function setupJoy(joy, type) {
+            joy.on('start', () => { joy.get().el.classList.add('active'); });
+            joy.on('move', (evt, data) => {
+                const pos = data.instance.ui.front.getBoundingClientRect();
+                activeTouches[type] = { x: pos.left + pos.width / 2, y: pos.top + pos.height / 2 };
+                if (conn && conn.open && data.vector) { conn.send({ type: type, x: data.vector.x, y: -data.vector.y, force: data.force }); }
+            });
+            joy.on('end', () => {
+                joy.get().el.classList.remove('active'); delete activeTouches[type];
+                if (conn && conn.open) conn.send({ type: type, x: 0, y: 0, force: 0 });
+            });
         }
-    }
-</script>
+        setupJoy(leftJoy,  'MOVE'); setupJoy(rightJoy, 'ROTATE');
+        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight; animate();
+    </script>
 </body>
 </html>
