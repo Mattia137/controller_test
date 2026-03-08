@@ -70,7 +70,8 @@
             joy.on('start', () => { joy.get().el.classList.add('active'); });
             joy.on('move', (evt, data) => {
                 const pos = data.instance.ui.front.getBoundingClientRect(); activeTouches[type] = { x: pos.left + pos.width/2, y: pos.top + pos.height/2 };
-                if (conn && conn.open && data.vector) { conn.send({ type: type, x: data.vector.x, y: -data.vector.y, force: data.force }); }
+                // This inverted Y value is critical for the camera to understand 'forward'
+                if (conn && conn.open && data.vector) { conn.send({ type: type, x: data.vector.x, y: -data.vector.y, force: data.force }); } 
             });
             joy.on('end', () => { joy.get().el.classList.remove('active'); delete activeTouches[type]; if (conn && conn.open) conn.send({ type: type, x: 0, y: 0, force: 0 }); });
         }
