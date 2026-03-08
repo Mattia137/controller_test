@@ -113,7 +113,6 @@
         const urlParams  = new URLSearchParams(window.location.search);
         const desktopId  = urlParams.get('id');
         
-        // TURN SERVER ADDED: Forces connection through strict school firewalls
         const peer = new Peer({
             config: {
                 'iceServers': [
@@ -131,7 +130,9 @@
         peer.on('open', () => {
             if (desktopId) {
                 setStatus('linking', 'LINKING');
-                conn = peer.connect(desktopId, { reliable: true });
+                
+                // THE FIX: Removed { reliable: true } which crashes Safari
+                conn = peer.connect(desktopId);
 
                 conn.on('open', () => {
                     setStatus('linked', 'LINKED');
