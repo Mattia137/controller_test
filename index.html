@@ -377,7 +377,11 @@ peer.on('open',()=>{
     if(!desktopId){ setStatus('','NO_ID'); return; }
     setStatus('linking','LINKING');
     conn = peer.connect(desktopId,{serialization:'json',reliable:true});
-    conn.on('open', ()=>setStatus('linked','LINKED'));
+    conn.on('open', ()=>{
+        setStatus('linked','LINKED');
+        // Start heartbeat pings every 2s so desktop detects disconnect
+        setInterval(()=>{ send({type:'PING'}); }, 2000);
+    });
     conn.on('close',()=>{ setStatus('','LOST'); conn=null; });
     conn.on('error',()=>setStatus('','ERROR'));
 });
