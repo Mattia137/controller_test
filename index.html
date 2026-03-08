@@ -8,7 +8,7 @@
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
     <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
 
         :root {
             --w:   #ffffff;
@@ -21,16 +21,18 @@
         }
 
         html, body {
-            width: 100%; height: 100%;
+            width: 100%; height: 100%; height: 100dvh;
             background: #000; color: var(--w);
             font-family: 'Fragment Mono', monospace;
-            overflow: hidden; user-select: none; touch-action: none;
+            overflow: hidden; user-select: none;
+            touch-action: none; -ms-touch-action: none;
+            overscroll-behavior: none; -webkit-overflow-scrolling: touch;
             position: fixed;
         }
 
         /* ── SCANLINES ──────────────────────────────────────── */
         body::before {
-            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 800;
             background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
         }
 
@@ -57,6 +59,7 @@
             border-right: 1px solid var(--dim);
             color: var(--w); font-family: 'Fragment Mono', monospace;
             cursor: pointer; transition: background 0.1s; position: relative;
+            touch-action: manipulation;
         }
         .top-btn:last-child { border-right: none; }
         .top-btn:active, .top-btn.flash { background: rgba(255,255,255,0.12); }
@@ -102,6 +105,7 @@
             cursor: pointer; display: flex; flex-direction: column;
             align-items: center; justify-content: center; gap: 5px;
             position: relative; overflow: hidden; transition: background 0.1s;
+            touch-action: manipulation;
         }
         #action-btn:active, #action-btn.flash { background: rgba(255,255,255,0.1); }
 
@@ -159,6 +163,7 @@
             color: var(--w); font-family: 'Fragment Mono', monospace;
             font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
             cursor: pointer; transition: background 0.15s;
+            touch-action: manipulation;
         }
         .nav-btn:nth-child(3n) { border-right: none; }
         .nav-btn:nth-child(n+4) { border-bottom: none; }
@@ -181,6 +186,7 @@
             color: rgba(255,255,255,0.4); font-family: 'Fragment Mono', monospace;
             font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
             cursor: pointer; transition: all 0.15s;
+            touch-action: manipulation;
         }
         .mode-btn:last-child { border-right: none; }
         .mode-btn:active { background: rgba(255,255,255,0.1); }
@@ -240,6 +246,7 @@
         #anim-slider {
             flex: 1; -webkit-appearance: none; appearance: none;
             height: 1px; background: rgba(255,255,255,0.2); outline: none;
+            touch-action: pan-x;
         }
         #anim-slider::-webkit-slider-thumb {
             -webkit-appearance: none; width: 14px; height: 14px;
@@ -307,6 +314,7 @@
             background: none; border: 1px solid rgba(255,255,255,0.25);
             color: #fff; font-family: 'Fragment Mono', monospace;
             padding: 16px 36px; cursor: pointer; text-transform: uppercase;
+            touch-action: manipulation;
         }
         #allow-btn:active { background: #fff; color: #000; }
 
@@ -324,13 +332,13 @@
 
 <!-- TOP BUTTONS: BACK · CALIBRATE · RESET -->
 <div id="top-bar">
-    <button class="top-btn" ontouchstart="tapBtn(this,'BACK')"   onclick="sendCmd('BACK')">
+    <button class="top-btn" onclick="tapBtn(this,'BACK'); sendCmd('BACK')">
         <span class="ti">←</span><span class="tl">BACK</span>
     </button>
-    <button class="top-btn" ontouchstart="tapBtn(this,'_CAL')"   onclick="calibrateGyro()">
+    <button class="top-btn" onclick="tapBtn(this,'_CAL'); calibrateGyro()">
         <span class="ti">⊕</span><span class="tl">CALIBRATE</span>
     </button>
-    <button class="top-btn" ontouchstart="tapBtn(this,'RESET')"  onclick="sendCmd('RESET')">
+    <button class="top-btn" onclick="tapBtn(this,'RESET'); sendCmd('RESET')">
         <span class="ti">⊙</span><span class="tl">RESET</span>
     </button>
 </div>
@@ -343,7 +351,7 @@
 
 <!-- ACTION BUTTON -->
 <div id="action-zone">
-    <button id="action-btn" ontouchstart="tapBtn(this,'ACTION')" onclick="sendCmd('ACTION')">
+    <button id="action-btn" onclick="tapBtn(this,'ACTION'); sendCmd('ACTION')">
         <div class="action-hline"></div>
         <div class="action-vline"></div>
         <span id="action-icon">◈</span>
@@ -353,11 +361,11 @@
 
 <!-- ASSEMBLY NAV BUTTONS -->
 <div id="nav-panel">
-    <button class="nav-btn" data-nav="structure" ontouchstart="tapNav(this)" onclick="sendNav('structure')">STRUCTURE</button>
-    <button class="nav-btn" data-nav="interiors" ontouchstart="tapNav(this)" onclick="sendNav('interiors')">INTERIOR</button>
-    <button class="nav-btn" data-nav="circulation" ontouchstart="tapNav(this)" onclick="sendNav('circulation')">CIRCULATION</button>
-    <button class="nav-btn" data-nav="media" ontouchstart="tapNav(this)" onclick="sendNav('media')">MEDIA</button>
-    <button class="nav-btn" data-nav="machinary" ontouchstart="tapNav(this)" onclick="sendNav('machinary')">MACHINERY</button>
+    <button class="nav-btn" data-nav="structure" onclick="sendNav('structure')">STRUCTURE</button>
+    <button class="nav-btn" data-nav="interiors" onclick="sendNav('interiors')">INTERIOR</button>
+    <button class="nav-btn" data-nav="circulation" onclick="sendNav('circulation')">CIRCULATION</button>
+    <button class="nav-btn" data-nav="media" onclick="sendNav('media')">MEDIA</button>
+    <button class="nav-btn" data-nav="machinary" onclick="sendNav('machinary')">MACHINERY</button>
 </div>
 
 <!-- MODE TOGGLE (WORLD) -->
@@ -422,16 +430,37 @@ const sdot=document.getElementById('sdot'), stxt=document.getElementById('stxt')
 function setStatus(cls,lbl){ sdot.className=cls; stxt.textContent=lbl; }
 
 // ── PEERJS ────────────────────────────────────────────────────────────────
-try{ localStorage.setItem('__t__','1'); localStorage.removeItem('__t__'); }
-catch(e){ const m={}; Object.defineProperty(window,'localStorage',{value:{getItem:k=>m[k]??null,setItem:(k,v)=>{m[k]=v;},removeItem:k=>delete m[k],clear:()=>Object.keys(m).forEach(k=>delete m[k])}}); }
+// iOS Safari: localStorage may throw AND window.localStorage is non-configurable
+// Use a safe wrapper instead of trying to redefine the property
+const _memStore = {};
+const _ls = {
+    getItem: k => { try { return localStorage.getItem(k); } catch(e) { return _memStore[k] ?? null; } },
+    setItem: (k,v) => { try { localStorage.setItem(k,v); } catch(e) { _memStore[k] = String(v); } },
+    removeItem: k => { try { localStorage.removeItem(k); } catch(e) { delete _memStore[k]; } }
+};
+
+// iOS Safari: prevent bounce scrolling (exempt slider and joystick)
+document.addEventListener('touchmove', function(e) {
+    const t = e.target;
+    if (t.tagName === 'INPUT') return; // slider
+    if (t.closest && t.closest('#joy-zone, .nipple, #joy-area')) return; // joystick
+    e.preventDefault();
+}, { passive: false });
 
 const desktopId = new URLSearchParams(window.location.search).get('id');
 let conn;
-const peer = new Peer({ config:{ iceServers:[
-    {urls:'stun:stun.l.google.com:19302'},
-    {urls:'stun:stun1.l.google.com:19302'},
-    {urls:'stun:stun.cloudflare.com:3478'}
-]}});
+let peer;
+try {
+    peer = new Peer({ config:{ iceServers:[
+        {urls:'stun:stun.l.google.com:19302'},
+        {urls:'stun:stun1.l.google.com:19302'},
+        {urls:'stun:stun.cloudflare.com:3478'}
+    ]}});
+} catch(e) {
+    setStatus('', 'PEER_ERR');
+}
+
+if (peer) {
 peer.on('open',()=>{
     if(!desktopId){ setStatus('','NO_ID'); return; }
     setStatus('linking','LINKING');
@@ -445,6 +474,7 @@ peer.on('open',()=>{
     conn.on('error',()=>setStatus('','ERROR'));
 });
 peer.on('error',(e)=>setStatus('',e.type||'ERR'));
+}
 
 function send(d){ if(conn&&conn.open) conn.send(d); }
 function sendSlider(val){ send({type:"SLIDE", value: parseFloat(val)/100}); }
@@ -458,7 +488,6 @@ function sendCmd(cmd){
 function tapBtn(el,cmd){
     el.classList.add('flash');
     setTimeout(()=>el.classList.remove('flash'),200);
-    if(cmd!=='_CAL') sendCmd(cmd);
 }
 
 // ── ASSEMBLY NAV ──────────────────────────────────────────────────────────
