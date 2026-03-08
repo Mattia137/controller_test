@@ -5,137 +5,597 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HYPEROBJECT // REMOTE</title>
     <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: 'Fragment Mono', monospace; overflow: hidden; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
-        #energy-canvas { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; }
-        .ui-layer { position: absolute; width: 100%; height: 100%; z-index: 20; pointer-events: none; }
-        .interactive { pointer-events: all; }
-        #reset-container { position: absolute; top: 40px; left: 50%; transform: translateX(-50%); }
-        .reset-btn { font-size: 10px; letter-spacing: 4px; border: 1px solid rgba(255, 255, 255, 0.3); background: none; color: #fff; font-family: 'Fragment Mono', monospace; padding: 8px 20px; cursor: pointer; transition: all 0.2s; }
-        .reset-btn:active { background: #fff; color: #000; }
-        #action-container { position: absolute; bottom: 45%; left: 25%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .action-square { width: 40px; height: 40px; border: 1px solid #fff; background: transparent; transition: background 0.1s; cursor: pointer; }
-        .action-square:active { background: #fff; }
-        .label-small { font-size: 7px; opacity: 0.3; letter-spacing: 2px; text-transform: uppercase; }
-        #slider-container { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 60%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 1px; background: rgba(255,255,255,0.2); }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 12px; width: 12px; background: #fff; margin-top: -6px; border-radius: 0; }
-        .zones { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; z-index: 10; }
-        .nipple .back { background: transparent !important; border: 0.5px solid rgba(255,255,255,0.1) !important; }
-        .nipple .front { background: transparent !important; border: 1px solid rgba(255,255,255,0.8) !important; transition: background 0.1s, box-shadow 0.1s; }
-        .nipple.active .front { background: #fff !important; box-shadow: 0 0 20px rgba(255, 255, 255, 0.6); }
-        #status-bar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; z-index: 30; }
-        #status-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff3a3a; transition: background 0.4s; }
-        #status-dot.linking { background: #ffaa00; animation: blink 0.6s infinite; }
-        #status-dot.linked  { background: #00ff88; animation: none; }
-        @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
-        #status-text { font-size: 7px; letter-spacing: 3px; opacity: 0.5; text-transform: uppercase; }
+        :root {
+            --white: #ffffff;
+            --dim: rgba(255,255,255,0.15);
+            --dim2: rgba(255,255,255,0.06);
+            --accent: rgba(255,255,255,0.55);
+            --red: #ff3a3a;
+            --amber: #ffaa00;
+            --green: #00ff88;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background: #000;
+            color: var(--white);
+            font-family: 'Fragment Mono', monospace;
+            overflow: hidden;
+            user-select: none;
+            touch-action: none;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* ── SCANLINE TEXTURE ─────────────────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.07) 2px,
+                rgba(0,0,0,0.07) 4px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* ── CORNER BRACKETS ──────────────────────────────────────── */
+        .corner {
+            position: fixed;
+            width: 18px;
+            height: 18px;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .corner.tl { top: 14px; left: 14px; border-top: 1px solid var(--dim); border-left: 1px solid var(--dim); }
+        .corner.tr { top: 14px; right: 14px; border-top: 1px solid var(--dim); border-right: 1px solid var(--dim); }
+        .corner.bl { bottom: 14px; left: 14px; border-bottom: 1px solid var(--dim); border-left: 1px solid var(--dim); }
+        .corner.br { bottom: 14px; right: 14px; border-bottom: 1px solid var(--dim); border-right: 1px solid var(--dim); }
+
+        /* ── STATUS BAR ───────────────────────────────────────────── */
+        #status-bar {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            z-index: 60;
+        }
+        #status-dot {
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: var(--red);
+            transition: background 0.4s;
+            flex-shrink: 0;
+        }
+        #status-dot.linking { background: var(--amber); animation: blink 0.7s infinite; }
+        #status-dot.linked  { background: var(--green); animation: none; }
+        @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.15; } }
+        #status-text {
+            font-size: 7px;
+            letter-spacing: 3px;
+            color: var(--accent);
+            text-transform: uppercase;
+        }
+
+        /* ── TOP BUTTON STRIP ─────────────────────────────────────── */
+        #top-strip {
+            position: fixed;
+            top: 44px;
+            left: 0;
+            right: 0;
+            padding: 0 24px;
+            display: flex;
+            gap: 10px;
+            z-index: 40;
+        }
+
+        .cmd-btn {
+            flex: 1;
+            height: 48px;
+            background: var(--dim2);
+            border: 1px solid var(--dim);
+            color: var(--white);
+            font-family: 'Fragment Mono', monospace;
+            font-size: 7px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .cmd-btn .btn-icon {
+            font-size: 11px;
+            opacity: 0.6;
+            line-height: 1;
+        }
+        .cmd-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--white);
+            opacity: 0;
+            transition: opacity 0.1s;
+        }
+        .cmd-btn:active::after { opacity: 0.12; }
+        .cmd-btn:active { border-color: rgba(255,255,255,0.5); }
+
+        /* corner ticks on buttons */
+        .cmd-btn::before {
+            content: '';
+            position: absolute;
+            top: 3px; left: 3px;
+            width: 4px; height: 4px;
+            border-top: 1px solid var(--dim);
+            border-left: 1px solid var(--dim);
+            pointer-events: none;
+        }
+
+        /* ── GYRO SECTION ─────────────────────────────────────────── */
+        #gyro-section {
+            position: fixed;
+            top: 50%;
+            right: 24px;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 40;
+        }
+
+        #gyro-viz {
+            width: 56px;
+            height: 56px;
+            border: 1px solid var(--dim);
+            border-radius: 50%;
+            position: relative;
+            background: var(--dim2);
+        }
+        #gyro-dot {
+            position: absolute;
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--white);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            transition: top 0.05s, left 0.05s;
+        }
+        #gyro-crosshair-h, #gyro-crosshair-v {
+            position: absolute;
+            background: var(--dim);
+        }
+        #gyro-crosshair-h { width: 100%; height: 1px; top: 50%; left: 0; transform: translateY(-50%); }
+        #gyro-crosshair-v { height: 100%; width: 1px; left: 50%; top: 0; transform: translateX(-50%); }
+
+        .gyro-label {
+            font-size: 6px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            text-align: center;
+        }
+
+        #gyro-calibrate {
+            font-size: 6px;
+            letter-spacing: 2px;
+            background: none;
+            border: 1px solid var(--dim);
+            color: var(--accent);
+            font-family: 'Fragment Mono', monospace;
+            padding: 5px 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.15s;
+        }
+        #gyro-calibrate:active { background: var(--white); color: #000; border-color: var(--white); }
+
+        #gyro-status {
+            font-size: 6px;
+            letter-spacing: 1px;
+            color: var(--accent);
+            text-align: center;
+            opacity: 0.5;
+        }
+
+        /* ── JOYSTICK ZONE ────────────────────────────────────────── */
+        #joy-zone {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 55%;
+            height: 55%;
+            z-index: 30;
+        }
+
+        /* joystick label */
+        #move-label {
+            position: fixed;
+            bottom: 20px;
+            left: 24px;
+            font-size: 6px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            opacity: 0.4;
+            z-index: 35;
+        }
+        #gyro-mode-label {
+            position: fixed;
+            bottom: 20px;
+            right: 24px;
+            font-size: 6px;
+            letter-spacing: 2px;
+            color: var(--accent);
+            opacity: 0.4;
+            z-index: 35;
+            text-align: right;
+        }
+
+        /* ── VERTICAL DIVIDER LINE ────────────────────────────────── */
+        #divider {
+            position: fixed;
+            left: 55%;
+            top: 110px;
+            bottom: 0;
+            width: 1px;
+            background: var(--dim2);
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* nipplejs overrides */
+        .nipple .back {
+            background: transparent !important;
+            border: 1px solid var(--dim) !important;
+            box-shadow: none !important;
+        }
+        .nipple .front {
+            background: transparent !important;
+            border: 1px solid rgba(255,255,255,0.7) !important;
+            box-shadow: none !important;
+            transition: background 0.1s, box-shadow 0.1s !important;
+        }
+        .nipple.active .front {
+            background: rgba(255,255,255,0.15) !important;
+            box-shadow: 0 0 16px rgba(255,255,255,0.3) !important;
+        }
+
+        /* ── GYRO PERMISSION OVERLAY ──────────────────────────────── */
+        #gyro-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        #gyro-overlay.hidden { display: none; }
+        .overlay-title { font-size: 9px; letter-spacing: 5px; opacity: 0.5; }
+        .overlay-desc { font-size: 8px; letter-spacing: 1px; opacity: 0.3; text-align: center; padding: 0 40px; line-height: 1.8; }
+        #allow-gyro-btn {
+            font-size: 9px;
+            letter-spacing: 4px;
+            background: none;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
+            font-family: 'Fragment Mono', monospace;
+            padding: 14px 32px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        #allow-gyro-btn:active { background: #fff; color: #000; }
+
+        /* ── ENERGY CANVAS ────────────────────────────────────────── */
+        #energy-canvas {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
+
     <canvas id="energy-canvas"></canvas>
-    <div id="status-bar"><div id="status-dot"></div><div id="status-text">SEARCHING</div></div>
-    <div class="ui-layer">
-        <div id="reset-container" class="interactive"><button class="reset-btn" onclick="sendCmd('RESET')">RESET</button></div>
-        <div id="action-container" class="interactive"><div class="action-square" onclick="sendCmd('ACTION')"></div><div class="label-small">EXECUTE</div></div>
-        <div id="slider-container" class="interactive"><div class="label-small" style="opacity: 0.2">SEQUENCE_MAP</div><input type="range" min="0" max="100" value="0" oninput="sendSlider(this.value)"></div>
+
+    <!-- corner decorations -->
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+
+    <!-- status -->
+    <div id="status-bar">
+        <div id="status-dot"></div>
+        <div id="status-text">SEARCHING</div>
     </div>
-    <div class="zones"><div id="left-zone"></div><div id="right-zone"></div></div>
+
+    <!-- top command buttons -->
+    <div id="top-strip">
+        <button class="cmd-btn" ontouchstart="sendCmd('BACK')" onclick="sendCmd('BACK')">
+            <span class="btn-icon">←</span>
+            <span>BACK</span>
+        </button>
+        <button class="cmd-btn" ontouchstart="sendCmd('RESET')" onclick="sendCmd('RESET')">
+            <span class="btn-icon">⊙</span>
+            <span>RESET</span>
+        </button>
+        <button class="cmd-btn" ontouchstart="sendCmd('ACTION')" onclick="sendCmd('ACTION')">
+            <span class="btn-icon">◈</span>
+            <span>ACTION</span>
+        </button>
+    </div>
+
+    <!-- divider -->
+    <div id="divider"></div>
+
+    <!-- joystick zone -->
+    <div id="joy-zone"></div>
+    <div id="move-label">TRANSLATE</div>
+    <div id="gyro-mode-label">GYRO_ROTATE</div>
+
+    <!-- gyro section -->
+    <div id="gyro-section">
+        <div class="gyro-label">ORIENTATION</div>
+        <div id="gyro-viz">
+            <div id="gyro-crosshair-h"></div>
+            <div id="gyro-crosshair-v"></div>
+            <div id="gyro-dot"></div>
+        </div>
+        <button id="gyro-calibrate" onclick="calibrateGyro()">CALIBRATE</button>
+        <div id="gyro-status">AWAITING</div>
+    </div>
+
+    <!-- gyro permission overlay (iOS) -->
+    <div id="gyro-overlay">
+        <div class="overlay-title">MOTION ACCESS</div>
+        <div class="overlay-desc">This controller uses your device's gyroscope to rotate the camera. Tap to allow motion sensor access.</div>
+        <button id="allow-gyro-btn" onclick="requestGyro()">ALLOW MOTION</button>
+    </div>
 
     <script>
-        const canvas = document.getElementById('energy-canvas'); const ctx = canvas.getContext('2d');
-        let particles = [], activeTouches = {}, time = 0;
+    // ── ENERGY PARTICLES ──────────────────────────────────────────────────
+    const canvas = document.getElementById('energy-canvas');
+    const ctx    = canvas.getContext('2d');
+    let particles = [], activeTouches = {}, animTime = 0;
 
-        class EnergyParticle {
-            constructor(tx, ty) {
-                const angle = Math.random() * Math.PI * 2; const radius = 60 + Math.random() * 100;
-                this.x = tx + Math.cos(angle) * radius; this.y = ty + Math.sin(angle) * radius;
-                this.tx = tx; this.ty = ty; this.size = Math.random() * 0.3 + 0.1;
-                this.speed = 0.015 + Math.random() * 0.02; this.life = 1.0; this.noiseOffset = Math.random() * 1000;
-            }
-            update() { this.x += (this.tx - this.x) * this.speed + Math.sin(time * 3 + this.noiseOffset) * 0.7; this.y += (this.ty - this.y) * this.speed + Math.cos(time * 3 + this.noiseOffset) * 0.7; this.life -= 0.015; }
-            draw() { const opacity = this.life * 0.4; const bloomSize = this.size * 50; const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, bloomSize); gradient.addColorStop(0, `rgba(255,255,255,${opacity})`); gradient.addColorStop(0.1, `rgba(255,255,255,${opacity * 0.1})`); gradient.addColorStop(1, `rgba(255,255,255,0)`); ctx.fillStyle = gradient; ctx.beginPath(); ctx.arc(this.x, this.y, bloomSize, 0, Math.PI * 2); ctx.fill(); }
+    class Particle {
+        constructor(tx, ty) {
+            const a = Math.random() * Math.PI * 2, r = 50 + Math.random() * 80;
+            this.x = tx + Math.cos(a)*r; this.y = ty + Math.sin(a)*r;
+            this.tx = tx; this.ty = ty;
+            this.size = Math.random() * 0.25 + 0.08;
+            this.speed = 0.012 + Math.random() * 0.018;
+            this.life = 1.0; this.no = Math.random() * 1000;
         }
-
-        function animate() {
-            time += 0.01; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.globalCompositeOperation = 'lighter';
-            Object.keys(activeTouches).forEach(key => { const t = activeTouches[key]; if (t) { for (let i = 0; i < 6; i++) particles.push(new EnergyParticle(t.x, t.y)); } });
-            particles.forEach((p, i) => { p.update(); p.draw(); if (p.life <= 0) particles.splice(i, 1); });
-            ctx.globalCompositeOperation = 'source-over'; requestAnimationFrame(animate);
+        update() {
+            this.x += (this.tx-this.x)*this.speed + Math.sin(animTime*3+this.no)*0.5;
+            this.y += (this.ty-this.y)*this.speed + Math.cos(animTime*3+this.no)*0.5;
+            this.life -= 0.018;
         }
-
-        const statusDot = document.getElementById('status-dot'); const statusText = document.getElementById('status-text');
-        function setStatus(state, label) { statusDot.className = state; statusText.textContent = label; }
-
-        const urlParams = new URLSearchParams(window.location.search);
-        const desktopId = urlParams.get('id');
-        
-        // Safari Private Browsing blocks localStorage — PeerJS needs it for ID storage.
-        // This polyfill makes it safe by falling back to a memory-only store.
-        try { localStorage.setItem('__test__', '1'); localStorage.removeItem('__test__'); }
-        catch(e) {
-            const mem = {};
-            Object.defineProperty(window, 'localStorage', {
-                value: { getItem: k => mem[k]??null, setItem: (k,v) => { mem[k]=v; }, removeItem: k => delete mem[k], clear: () => Object.keys(mem).forEach(k=>delete mem[k]) }
-            });
+        draw() {
+            const op = this.life * 0.35, bs = this.size * 45;
+            const g = ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,bs);
+            g.addColorStop(0, `rgba(255,255,255,${op})`);
+            g.addColorStop(0.15, `rgba(255,255,255,${op*0.08})`);
+            g.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(this.x,this.y,bs,0,Math.PI*2); ctx.fill();
         }
+    }
 
-        const peer = new Peer({
-            config: {
-                'iceServers': [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun.cloudflare.com:3478' }
-                ]
-            }
+    function animLoop() {
+        animTime += 0.01;
+        ctx.fillStyle = '#000'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.globalCompositeOperation = 'lighter';
+        Object.values(activeTouches).forEach(t => {
+            if (t) for (let i=0;i<4;i++) particles.push(new Particle(t.x,t.y));
         });
-        
-        let conn;
-
-        peer.on('open', () => {
-            if (desktopId) {
-                setStatus('linking', 'LINKING');
-                
-                // THE FIX: Bypassing BinaryPack serialization so Safari doesn't crash on handshake
-                conn = peer.connect(desktopId, { serialization: 'json' });
-
-                conn.on('open', () => { setStatus('linked', 'LINKED'); });
-                conn.on('close', () => { setStatus('', 'DISCONNECTED'); conn = null; });
-                conn.on('error', (err) => { setStatus('', 'ERROR'); console.error('Conn error:', err); });
-            } else { setStatus('', 'NO_ID'); }
-        });
-
-        peer.on('error', (err) => { 
-            setStatus('', err.type || 'PEER_ERR'); 
-            console.error('Peer error type:', err.type, err); 
-        });
-
-        function sendCmd(cmd) { if (conn && conn.open) { conn.send({ type: 'BUTTON', action: cmd }); if (navigator.vibrate) navigator.vibrate(25); } }
-        function sendSlider(val) { if (conn && conn.open) conn.send({ type: 'SLIDE', value: parseFloat(val) / 100 }); }
-
-        const options = { mode: 'static', size: 100 };
-        const leftJoy = nipplejs.create({ zone: document.getElementById('left-zone'),  ...options, position: { bottom: '25%', left:  '25%' } });
-        const rightJoy = nipplejs.create({ zone: document.getElementById('right-zone'), ...options, position: { bottom: '25%', right: '25%' } });
-
-        function setupJoy(joy, type) {
-            joy.on('start', () => { joy.get().el.classList.add('active'); });
-            joy.on('move', (evt, data) => {
-                const pos = data.instance.ui.front.getBoundingClientRect();
-                activeTouches[type] = { x: pos.left + pos.width / 2, y: pos.top + pos.height / 2 };
-                if (conn && conn.open && data.vector) { conn.send({ type: type, x: data.vector.x, y: -data.vector.y, force: data.force }); }
-            });
-            joy.on('end', () => {
-                joy.get().el.classList.remove('active'); delete activeTouches[type];
-                if (conn && conn.open) conn.send({ type: type, x: 0, y: 0, force: 0 });
-            });
+        for (let i = particles.length-1; i >= 0; i--) {
+            particles[i].update(); particles[i].draw();
+            if (particles[i].life <= 0) particles.splice(i,1);
         }
-        setupJoy(leftJoy,  'MOVE'); setupJoy(rightJoy, 'ROTATE');
-        window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-        canvas.width = window.innerWidth; canvas.height = window.innerHeight; animate();
+        ctx.globalCompositeOperation = 'source-over';
+        requestAnimationFrame(animLoop);
+    }
+
+    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resizeCanvas); resizeCanvas(); animLoop();
+
+    // ── STATUS ────────────────────────────────────────────────────────────
+    const statusDot  = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    function setStatus(cls, label) { statusDot.className = cls; statusText.textContent = label; }
+
+    // ── PEERJS ────────────────────────────────────────────────────────────
+    // localStorage guard for Safari private
+    try { localStorage.setItem('__t__','1'); localStorage.removeItem('__t__'); }
+    catch(e) {
+        const m={};
+        Object.defineProperty(window,'localStorage',{ value:{
+            getItem:k=>m[k]??null, setItem:(k,v)=>{m[k]=v;},
+            removeItem:k=>delete m[k], clear:()=>Object.keys(m).forEach(k=>delete m[k])
+        }});
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const desktopId = urlParams.get('id');
+    let conn;
+
+    const peer = new Peer({
+        config: { iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun.cloudflare.com:3478' }
+        ]}
+    });
+
+    peer.on('open', () => {
+        if (!desktopId) { setStatus('', 'NO_ID'); return; }
+        setStatus('linking', 'LINKING');
+        conn = peer.connect(desktopId, { serialization: 'json', reliable: true });
+        conn.on('open',  () => setStatus('linked',  'LINKED'));
+        conn.on('close', () => { setStatus('', 'LOST'); conn = null; });
+        conn.on('error', () => setStatus('', 'ERROR'));
+    });
+    peer.on('error', (err) => setStatus('', err.type || 'ERR'));
+
+    function send(data) { if (conn && conn.open) conn.send(data); }
+
+    function sendCmd(cmd) {
+        send({ type: 'BUTTON', action: cmd });
+        if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function sendSlider(val) { send({ type: 'SLIDE', value: parseFloat(val)/100 }); }
+
+    // ── JOYSTICK ──────────────────────────────────────────────────────────
+    const joy = nipplejs.create({
+        zone: document.getElementById('joy-zone'),
+        mode: 'static',
+        size: 110,
+        position: { bottom: '38%', left: '42%' }
+    });
+
+    joy.on('start', () => {
+        const el = joy.get().el;
+        el.classList.add('active');
+    });
+
+    joy.on('move', (evt, data) => {
+        const pos = data.instance.ui.front.getBoundingClientRect();
+        activeTouches['MOVE'] = { x: pos.left + pos.width/2, y: pos.top + pos.height/2 };
+        if (data.vector) send({ type:'MOVE', x: data.vector.x, y: -data.vector.y, force: data.force });
+    });
+
+    joy.on('end', () => {
+        joy.get().el.classList.remove('active');
+        delete activeTouches['MOVE'];
+        send({ type:'MOVE', x:0, y:0, force:0 });
+    });
+
+    // ── GYROSCOPE ─────────────────────────────────────────────────────────
+    const gyroStatus = document.getElementById('gyro-status');
+    const gyroDot    = document.getElementById('gyro-dot');
+    const gyroViz    = document.getElementById('gyro-viz');
+    const gyroR      = gyroViz.offsetWidth / 2 - 6; // usable radius
+
+    let gyroActive    = false;
+    let baseAlpha     = null;   // calibration: yaw zero
+    let baseBeta      = null;   // calibration: pitch zero
+    const SENSITIVITY = 0.012;  // lower = less sensitive
+    const DEADZONE    = 1.2;    // degrees of deadzone
+
+    function calibrateGyro() {
+        baseAlpha = null; baseBeta = null;
+        gyroStatus.textContent = 'CALIBRATED';
+        if (navigator.vibrate) navigator.vibrate([20, 50, 20]);
+    }
+
+    function onOrientation(e) {
+        if (!gyroActive) {
+            gyroActive = true;
+            gyroStatus.textContent = 'ACTIVE';
+        }
+
+        // Use gamma (left/right tilt) for horizontal rotation
+        // Use beta  (front/back tilt) for vertical rotation
+        const rawGamma = e.gamma || 0;  // -90 to 90
+        const rawBeta  = e.beta  || 0;  // -180 to 180
+
+        // Set zero reference on first read or after calibrate
+        if (baseAlpha === null) { baseAlpha = rawGamma; baseBeta = rawBeta; return; }
+
+        let dx = rawGamma - baseAlpha;
+        let dy = rawBeta  - baseBeta;
+
+        // Deadzone
+        if (Math.abs(dx) < DEADZONE) dx = 0;
+        if (Math.abs(dy) < DEADZONE) dy = 0;
+
+        // Update gyro viz dot
+        const vizX = 50 + Math.max(-45, Math.min(45, dx)) / 45 * 45;
+        const vizY = 50 + Math.max(-45, Math.min(45, dy)) / 45 * 45;
+        gyroDot.style.left = vizX + '%';
+        gyroDot.style.top  = vizY + '%';
+
+        // Only send if meaningful movement
+        if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+            // Clamp and normalize to -1..1 range (max 45° = full)
+            const nx = Math.max(-1, Math.min(1, dx / 45));
+            const ny = Math.max(-1, Math.min(1, dy / 45));
+            send({ type: 'ROTATE', x: nx * SENSITIVITY * 45, y: ny * SENSITIVITY * 45, force: 1 });
+        } else {
+            send({ type: 'ROTATE', x:0, y:0, force: 0 });
+        }
+
+        // Particle effect on gyro viz center for visual feedback
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+            const rect = gyroViz.getBoundingClientRect();
+            activeTouches['GYRO'] = { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+        } else {
+            delete activeTouches['GYRO'];
+        }
+    }
+
+    // ── GYRO PERMISSION ───────────────────────────────────────────────────
+    const overlay = document.getElementById('gyro-overlay');
+
+    function startGyroListener() {
+        window.addEventListener('deviceorientation', onOrientation, true);
+        gyroStatus.textContent = 'LISTENING';
+    }
+
+    function requestGyro() {
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            // iOS 13+ requires explicit permission
+            DeviceOrientationEvent.requestPermission()
+                .then(state => {
+                    if (state === 'granted') {
+                        overlay.classList.add('hidden');
+                        startGyroListener();
+                    } else {
+                        gyroStatus.textContent = 'DENIED';
+                        overlay.classList.add('hidden');
+                    }
+                })
+                .catch(() => {
+                    gyroStatus.textContent = 'ERROR';
+                    overlay.classList.add('hidden');
+                });
+        } else {
+            // Android or desktop — no permission needed
+            overlay.classList.add('hidden');
+            startGyroListener();
+        }
+    }
+
+    // Auto-dismiss overlay for non-iOS devices
+    if (typeof DeviceOrientationEvent === 'undefined' ||
+        typeof DeviceOrientationEvent.requestPermission !== 'function') {
+        overlay.classList.add('hidden');
+        startGyroListener();
+    }
     </script>
 </body>
 </html>
