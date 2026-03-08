@@ -142,10 +142,54 @@
         #action-icon { font-size: 18px; letter-spacing: 5px; opacity: 0.7; position: relative; z-index: 1; }
         #action-label { font-size: 13px; letter-spacing: 4px; text-transform: uppercase; opacity: 0.35; position: relative; z-index: 1; }
 
+        /* ── NAV PANEL (ASSEMBLY BUTTONS) ───────────────────── */
+        #nav-panel {
+            position: fixed;
+            top: 228px; left: 0; right: 0;
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            border-bottom: 1px solid var(--dim);
+            z-index: 300;
+        }
+        .nav-btn {
+            display: flex; align-items: center; justify-content: center;
+            padding: 12px 4px;
+            background: var(--d2); border: none;
+            border-right: 1px solid var(--dim);
+            border-bottom: 1px solid var(--dim);
+            color: var(--w); font-family: 'Fragment Mono', monospace;
+            font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .nav-btn:nth-child(3n) { border-right: none; }
+        .nav-btn:nth-child(n+4) { border-bottom: none; }
+        .nav-btn:active, .nav-btn.flash { background: rgba(255,255,255,0.12); }
+        .nav-btn.active { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); }
+
+        /* ── MODE TOGGLE (MASS / PROGRAM) ──────────────────── */
+        #mode-zone {
+            position: fixed;
+            top: 304px; left: 0; right: 0;
+            height: 40px;
+            display: grid; grid-template-columns: 1fr 1fr;
+            border-bottom: 1px solid var(--dim);
+            z-index: 300;
+        }
+        .mode-btn {
+            display: flex; align-items: center; justify-content: center;
+            background: var(--d2); border: none;
+            border-right: 1px solid var(--dim);
+            color: rgba(255,255,255,0.4); font-family: 'Fragment Mono', monospace;
+            font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .mode-btn:last-child { border-right: none; }
+        .mode-btn:active { background: rgba(255,255,255,0.1); }
+        .mode-btn.active { color: #fff; background: rgba(255,255,255,0.1); border-bottom: 2px solid rgba(255,255,255,0.5); }
+
         /* ── GYRO STRIP ──────────────────────────────────────── */
         #gyro-strip {
             position: fixed;
-            top: 228px; left: 0; right: 0;
+            top: 344px; left: 0; right: 0;
             height: 40px;
             display: flex; align-items: center;
             padding: 0 16px; gap: 12px;
@@ -206,7 +250,7 @@
         /* ── JOYSTICK ZONE ───────────────────────────────────── */
         #joy-area {
             position: fixed;
-            top: 268px; left: 0; right: 0; bottom: 0;
+            top: 384px; left: 0; right: 0; bottom: 0;
             z-index: 100;
         }
         #joy-zone { position: absolute; inset: 0; }
@@ -307,6 +351,21 @@
     </button>
 </div>
 
+<!-- ASSEMBLY NAV BUTTONS -->
+<div id="nav-panel">
+    <button class="nav-btn" data-nav="structure" ontouchstart="tapNav(this)" onclick="sendNav('structure')">STRUCTURE</button>
+    <button class="nav-btn" data-nav="interiors" ontouchstart="tapNav(this)" onclick="sendNav('interiors')">INTERIOR</button>
+    <button class="nav-btn" data-nav="circulation" ontouchstart="tapNav(this)" onclick="sendNav('circulation')">CIRCULATION</button>
+    <button class="nav-btn" data-nav="media" ontouchstart="tapNav(this)" onclick="sendNav('media')">MEDIA</button>
+    <button class="nav-btn" data-nav="machinary" ontouchstart="tapNav(this)" onclick="sendNav('machinary')">MACHINERY</button>
+</div>
+
+<!-- MODE TOGGLE (WORLD) -->
+<div id="mode-zone">
+    <button class="mode-btn active" data-mode="mass" onclick="sendMode('mass')">MASS</button>
+    <button class="mode-btn" data-mode="program" onclick="sendMode('program')">PROGRAM</button>
+</div>
+
 <!-- GYRO STRIP -->
 <div id="gyro-strip">
     <span id="gyro-label">LOOK</span>
@@ -400,6 +459,30 @@ function tapBtn(el,cmd){
     el.classList.add('flash');
     setTimeout(()=>el.classList.remove('flash'),200);
     if(cmd!=='_CAL') sendCmd(cmd);
+}
+
+// ── ASSEMBLY NAV ──────────────────────────────────────────────────────────
+function sendNav(id){
+    // Toggle active state on controller
+    const btns = document.querySelectorAll('#nav-panel .nav-btn');
+    const clicked = document.querySelector(`#nav-panel .nav-btn[data-nav="${id}"]`);
+    const wasActive = clicked.classList.contains('active');
+    btns.forEach(b => b.classList.remove('active'));
+    if (!wasActive) clicked.classList.add('active');
+    send({type:'BUTTON', action:'NAV', navId: wasActive ? null : id});
+    if(navigator.vibrate) navigator.vibrate(16);
+}
+function tapNav(el){
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'),200);
+}
+
+// ── MODE TOGGLE ───────────────────────────────────────────────────────────
+function sendMode(mode){
+    document.querySelectorAll('#mode-zone .mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#mode-zone .mode-btn[data-mode="${mode}"]`).classList.add('active');
+    send({type:'BUTTON', action:'MODE', mode: mode});
+    if(navigator.vibrate) navigator.vibrate(16);
 }
 
 // ── JOYSTICK ──────────────────────────────────────────────────────────────
