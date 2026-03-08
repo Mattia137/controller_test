@@ -28,24 +28,9 @@
         .nipple .front { background: transparent !important; border: 1px solid rgba(255,255,255,0.8) !important; transition: background 0.1s, box-shadow 0.1s; }
         .nipple.active .front { background: #fff !important; box-shadow: 0 0 20px rgba(255, 255, 255, 0.6); }
 
-        /* --- CONNECTION STATUS INDICATOR --- */
-        #status-bar {
-            position: absolute;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            z-index: 30;
-        }
-        #status-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #ff3a3a; 
-            transition: background 0.4s;
-        }
+        /* STATUS BAR INDICATOR */
+        #status-bar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; z-index: 30; }
+        #status-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff3a3a; transition: background 0.4s; }
         #status-dot.linking { background: #ffaa00; animation: blink 0.6s infinite; }
         #status-dot.linked  { background: #00ff88; animation: none; }
         @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
@@ -127,7 +112,20 @@
 
         const urlParams  = new URLSearchParams(window.location.search);
         const desktopId  = urlParams.get('id');
-        const peer       = new Peer();
+        
+        // TURN SERVER ADDED: Forces connection through strict school firewalls
+        const peer = new Peer({
+            config: {
+                'iceServers': [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+                    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+                    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+                ]
+            }
+        });
+        
         let conn;
 
         peer.on('open', () => {
