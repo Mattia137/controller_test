@@ -73,13 +73,23 @@
         const urlParams = new URLSearchParams(window.location.search);
         const desktopId = urlParams.get('id');
         
+        // Safari Private Browsing blocks localStorage — PeerJS needs it for ID storage.
+        // This polyfill makes it safe by falling back to a memory-only store.
+        try { localStorage.setItem('__test__', '1'); localStorage.removeItem('__test__'); }
+        catch(e) {
+            const mem = {};
+            Object.defineProperty(window, 'localStorage', {
+                value: { getItem: k => mem[k]??null, setItem: (k,v) => { mem[k]=v; }, removeItem: k => delete mem[k], clear: () => Object.keys(mem).forEach(k=>delete mem[k]) }
+            });
+        }
+
         const peer = new Peer({
             config: {
                 'iceServers': [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
-                    { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
-                    { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun.cloudflare.com:3478' }
                 ]
             }
         });
@@ -99,7 +109,10 @@
             } else { setStatus('', 'NO_ID'); }
         });
 
-        peer.on('error', (err) => { setStatus('', 'PEER_ERR'); console.error('Peer error:', err); });
+        peer.on('error', (err) => { 
+            setStatus('', err.type || 'PEER_ERR'); 
+            console.error('Peer error type:', err.type, err); 
+        });
 
         function sendCmd(cmd) { if (conn && conn.open) { conn.send({ type: 'BUTTON', action: cmd }); if (navigator.vibrate) navigator.vibrate(25); } }
         function sendSlider(val) { if (conn && conn.open) conn.send({ type: 'SLIDE', value: parseFloat(val) / 100 }); }
