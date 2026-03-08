@@ -8,308 +8,436 @@
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
         :root {
-            --dim:  rgba(255,255,255,0.12);
-            --dim2: rgba(255,255,255,0.05);
-            --acc:  rgba(255,255,255,0.45);
-            --red:  #ff3a3a; --amber: #ffaa00; --green: #00ff88;
+            --w:   #ffffff;
+            --dim: rgba(255,255,255,0.10);
+            --d2:  rgba(255,255,255,0.04);
+            --acc: rgba(255,255,255,0.40);
+            --grn: #00ff88;
+            --amb: #ffaa00;
+            --red: #ff3535;
         }
-        body {
-            background: #000; color: #fff;
+
+        html, body {
+            width: 100%; height: 100%;
+            background: #000; color: var(--w);
             font-family: 'Fragment Mono', monospace;
             overflow: hidden; user-select: none; touch-action: none;
-            width: 100vw; height: 100dvh; position: fixed;
+            position: fixed;
         }
-        body::after {
-            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 200;
-            background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px);
-        }
-        .corner { position: fixed; width: 14px; height: 14px; pointer-events: none; z-index: 150; opacity: 0.25; }
-        .corner.tl { top: 10px; left: 10px;   border-top: 1px solid #fff; border-left:  1px solid #fff; }
-        .corner.tr { top: 10px; right: 10px;  border-top: 1px solid #fff; border-right: 1px solid #fff; }
-        .corner.bl { bottom: 10px; left: 10px;  border-bottom: 1px solid #fff; border-left:  1px solid #fff; }
-        .corner.br { bottom: 10px; right: 10px; border-bottom: 1px solid #fff; border-right: 1px solid #fff; }
 
-        /* TOP BAR */
+        /* ── SCANLINES ──────────────────────────────────────── */
+        body::before {
+            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+        }
+
+        /* ── CORNER MARKS ────────────────────────────────────── */
+        .c { position: fixed; width: 10px; height: 10px; pointer-events: none; z-index: 500; }
+        .c.tl { top: 8px;    left: 8px;    border-top: 1px solid var(--dim); border-left:  1px solid var(--dim); }
+        .c.tr { top: 8px;    right: 8px;   border-top: 1px solid var(--dim); border-right: 1px solid var(--dim); }
+        .c.bl { bottom: 8px; left: 8px;    border-bottom: 1px solid var(--dim); border-left:  1px solid var(--dim); }
+        .c.br { bottom: 8px; right: 8px;   border-bottom: 1px solid var(--dim); border-right: 1px solid var(--dim); }
+
+        /* ── TOP BAR: 3 BUTTONS ──────────────────────────────── */
         #top-bar {
-            position: fixed; top: 0; left: 0; right: 0; height: 56px;
-            display: flex; align-items: stretch;
-            border-bottom: 1px solid var(--dim); z-index: 100;
+            position: fixed; top: 0; left: 0; right: 0;
+            height: 54px;
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            border-bottom: 1px solid var(--dim);
+            z-index: 400;
         }
-        .cmd-btn {
-            flex: 1; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 3px;
-            background: var(--dim2); border: none;
+
+        .top-btn {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 2px;
+            background: var(--d2); border: none;
             border-right: 1px solid var(--dim);
-            color: #fff; font-family: 'Fragment Mono', monospace;
-            cursor: pointer; position: relative; overflow: hidden;
-            transition: background 0.1s;
+            color: var(--w); font-family: 'Fragment Mono', monospace;
+            cursor: pointer; transition: background 0.1s; position: relative;
         }
-        .cmd-btn:last-child { border-right: none; }
-        .cmd-btn.pressed { background: rgba(255,255,255,0.18); }
-        .btn-icon  { font-size: 18px; line-height: 1; opacity: 0.65; }
-        .btn-label { font-size: 7px; letter-spacing: 3px; opacity: 0.4; text-transform: uppercase; }
+        .top-btn:last-child { border-right: none; }
+        .top-btn:active, .top-btn.flash { background: rgba(255,255,255,0.12); }
+        .top-btn .ti { font-size: 15px; opacity: 0.5; line-height: 1; }
+        .top-btn .tl { font-size: 7px; letter-spacing: 3px; text-transform: uppercase; opacity: 0.4; }
 
-        /* STATUS */
-        #status-bar {
-            position: fixed; top: 62px; left: 50%; transform: translateX(-50%);
-            display: flex; align-items: center; gap: 7px; z-index: 100;
-        }
-        #status-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); transition: background 0.4s; }
-        #status-dot.linking { background: var(--amber); animation: blink 0.7s infinite; }
-        #status-dot.linked  { background: var(--green); animation: none; }
-        @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.1;} }
-        #status-text { font-size: 7px; letter-spacing: 3px; color: var(--acc); text-transform: uppercase; }
-
-        /* MAIN LAYOUT */
-        #main-area {
-            position: fixed; top: 56px; bottom: 0; left: 0; right: 0;
-            display: flex;
+        /* corner tick on each button */
+        .top-btn::after {
+            content: ''; position: absolute; top: 4px; left: 4px;
+            width: 5px; height: 5px;
+            border-top: 1px solid var(--dim); border-left: 1px solid var(--dim);
+            pointer-events: none;
         }
 
-        /* LEFT: JOYSTICK */
-        #left-panel { flex: 1.1; position: relative; border-right: 1px solid var(--dim); }
-        #joy-zone   { position: absolute; inset: 0; }
-        #move-label {
-            position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
-            font-size: 7px; letter-spacing: 3px; color: var(--acc); opacity: 0.35;
-            white-space: nowrap; pointer-events: none;
+        /* ── STATUS ROW ──────────────────────────────────────── */
+        #status-row {
+            position: fixed; top: 58px; left: 0; right: 0;
+            height: 22px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            border-bottom: 1px solid var(--dim);
+            z-index: 300;
         }
+        #sdot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); transition: background 0.4s; flex-shrink: 0; }
+        #sdot.linking { background: var(--amb); animation: blink 0.7s infinite; }
+        #sdot.linked  { background: var(--grn); animation: none; }
+        @keyframes blink { 0%,100%{opacity:1;}50%{opacity:0.1;} }
+        #stxt { font-size: 7px; letter-spacing: 3px; color: var(--acc); text-transform: uppercase; }
 
-        /* RIGHT: GYRO */
-        #right-panel {
-            flex: 0.9; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 16px; padding: 16px;
+        /* ── ACTION BUTTON ───────────────────────────────────── */
+        #action-zone {
+            position: fixed;
+            top: 80px; left: 0; right: 0;
+            height: 80px;
+            display: flex; align-items: center; justify-content: center;
+            border-bottom: 1px solid var(--dim);
+            z-index: 300;
+            background: var(--d2);
         }
-        .gyro-section-label {
-            font-size: 7px; letter-spacing: 3px; color: var(--acc); opacity: 0.35; text-transform: uppercase;
+        #action-btn {
+            width: 100%; height: 100%;
+            background: transparent; border: none;
+            color: var(--w); font-family: 'Fragment Mono', monospace;
+            cursor: pointer; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 5px;
+            position: relative; overflow: hidden; transition: background 0.1s;
         }
-        #gyro-ring {
-            width: 100px; height: 100px; border-radius: 50%;
-            border: 1px solid var(--dim); background: var(--dim2);
-            position: relative; flex-shrink: 0; transition: border-color 0.2s;
-        }
-        #gyro-ring::before {
-            content: ''; position: absolute;
-            width: 1px; height: 100%; left: 50%; top: 0;
-            transform: translateX(-50%); background: var(--dim);
-        }
-        #gyro-ring::after {
-            content: ''; position: absolute;
-            height: 1px; width: 100%; top: 50%; left: 0;
-            transform: translateY(-50%); background: var(--dim);
-        }
-        #gyro-ring.active { border-color: rgba(255,255,255,0.3); box-shadow: 0 0 16px rgba(255,255,255,0.04); }
-        #gyro-dot {
-            position: absolute; width: 8px; height: 8px; border-radius: 50%;
-            background: #fff; top: 50%; left: 50%;
+        #action-btn:active, #action-btn.flash { background: rgba(255,255,255,0.1); }
+
+        /* target reticle decoration */
+        #action-btn::before {
+            content: '';
+            position: absolute;
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            border: 1px solid var(--dim);
+            left: 50%; top: 50%;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 8px rgba(255,255,255,0.5);
-            transition: top 0.05s linear, left 0.05s linear;
+            pointer-events: none;
         }
-        #gyro-status {
-            font-size: 7px; letter-spacing: 2px; color: var(--acc);
-            opacity: 0.35; text-transform: uppercase;
+        #action-btn::after {
+            content: '';
+            position: absolute;
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            border: 1px solid var(--dim);
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
         }
-        #gyro-status.active { opacity: 1; color: var(--green); }
-        #gyro-cal {
-            font-size: 7px; letter-spacing: 2px; background: none;
+        /* horizontal line through action */
+        .action-hline {
+            position: absolute; height: 1px; width: 60px;
+            background: var(--dim); left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        .action-vline {
+            position: absolute; width: 1px; height: 28px;
+            background: var(--dim); left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        #action-icon { font-size: 9px; letter-spacing: 5px; opacity: 0.7; position: relative; z-index: 1; }
+        #action-label { font-size: 7px; letter-spacing: 4px; text-transform: uppercase; opacity: 0.35; position: relative; z-index: 1; }
+
+        /* ── GYRO STRIP ──────────────────────────────────────── */
+        #gyro-strip {
+            position: fixed;
+            top: 160px; left: 0; right: 0;
+            height: 36px;
+            display: flex; align-items: center;
+            padding: 0 16px; gap: 12px;
+            border-bottom: 1px solid var(--dim);
+            z-index: 300;
+        }
+        #gyro-label { font-size: 7px; letter-spacing: 3px; opacity: 0.3; text-transform: uppercase; flex-shrink: 0; }
+
+        /* inline gyro bar visualization */
+        #gyro-bar-container {
+            flex: 1; height: 1px; background: var(--dim); position: relative;
+        }
+        #gyro-bar-x {
+            position: absolute; top: -2px; height: 5px; width: 1px;
+            background: rgba(255,255,255,0.6);
+            left: 50%; transform: translateX(-50%);
+            transition: left 0.05s linear;
+        }
+        #gyro-bar-center {
+            position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
+            width: 1px; height: 7px; background: var(--dim);
+        }
+        #gyro-stat { font-size: 7px; letter-spacing: 2px; opacity: 0.3; flex-shrink: 0; text-transform: uppercase; }
+        #gyro-stat.live { opacity: 0.7; color: var(--grn); }
+
+        #cal-btn {
+            font-size: 6px; letter-spacing: 2px; background: none;
             border: 1px solid var(--dim); color: var(--acc);
             font-family: 'Fragment Mono', monospace;
-            padding: 8px 12px; cursor: pointer; text-transform: uppercase;
-            transition: all 0.15s;
+            padding: 4px 8px; cursor: pointer; text-transform: uppercase;
+            transition: all 0.1s; flex-shrink: 0;
         }
-        #gyro-cal:active { background: #fff; color: #000; border-color: #fff; }
+        #cal-btn:active { background: #fff; color: #000; border-color: #fff; }
 
-        /* nipplejs */
-        .nipple .back { background: transparent !important; border: 1px solid var(--dim) !important; box-shadow: none !important; }
-        .nipple .front { background: transparent !important; border: 1px solid rgba(255,255,255,0.7) !important; box-shadow: none !important; }
-        .nipple.active .front { background: rgba(255,255,255,0.1) !important; box-shadow: 0 0 16px rgba(255,255,255,0.2) !important; }
+        /* ── JOYSTICK ZONE ───────────────────────────────────── */
+        #joy-area {
+            position: fixed;
+            top: 196px; left: 0; right: 0; bottom: 0;
+            z-index: 100;
+        }
+        #joy-zone { position: absolute; inset: 0; }
 
-        /* GYRO PERMISSION */
+        /* move label bottom center */
+        #move-label {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 7px; letter-spacing: 3px; opacity: 0.2;
+            text-transform: uppercase; pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* subtle grid background in joy area */
+        #joy-area::before {
+            content: '';
+            position: absolute; inset: 0;
+            background-image:
+                linear-gradient(var(--dim) 1px, transparent 1px),
+                linear-gradient(90deg, var(--dim) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        /* nipplejs styling */
+        .nipple .back {
+            background: transparent !important;
+            border: 1px solid rgba(255,255,255,0.15) !important;
+            box-shadow: none !important;
+        }
+        .nipple .front {
+            background: transparent !important;
+            border: 1px solid rgba(255,255,255,0.65) !important;
+            box-shadow: none !important;
+        }
+        .nipple.active .front {
+            background: rgba(255,255,255,0.08) !important;
+            box-shadow: 0 0 20px rgba(255,255,255,0.18) !important;
+        }
+
+        /* ── GYRO PERMISSION OVERLAY ─────────────────────────── */
         #gyro-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.96);
-            z-index: 300; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; gap: 24px; padding: 36px;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.97);
+            z-index: 9000; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 28px; padding: 48px;
         }
         #gyro-overlay.hidden { display: none; }
-        .ol-title { font-size: 10px; letter-spacing: 5px; opacity: 0.5; text-transform: uppercase; }
-        .ol-desc  { font-size: 9px; letter-spacing: 1px; opacity: 0.3; text-align: center; line-height: 2.2; }
+        .ov-title { font-size: 9px; letter-spacing: 6px; opacity: 0.45; text-transform: uppercase; }
+        .ov-body  { font-size: 8px; letter-spacing: 1px; opacity: 0.25; text-align: center; line-height: 2.2; }
         #allow-btn {
-            font-size: 9px; letter-spacing: 4px; background: none;
-            border: 1px solid rgba(255,255,255,0.3); color: #fff;
-            font-family: 'Fragment Mono', monospace;
-            padding: 16px 32px; cursor: pointer; text-transform: uppercase;
+            font-size: 8px; letter-spacing: 4px;
+            background: none; border: 1px solid rgba(255,255,255,0.25);
+            color: #fff; font-family: 'Fragment Mono', monospace;
+            padding: 16px 36px; cursor: pointer; text-transform: uppercase;
         }
         #allow-btn:active { background: #fff; color: #000; }
 
-        #energy-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+        /* ── ENERGY CANVAS ───────────────────────────────────── */
+        #ec { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
     </style>
 </head>
 <body>
 
-<canvas id="energy-canvas"></canvas>
-<div class="corner tl"></div><div class="corner tr"></div>
-<div class="corner bl"></div><div class="corner br"></div>
+<canvas id="ec"></canvas>
 
+<!-- corner marks -->
+<div class="c tl"></div><div class="c tr"></div>
+<div class="c bl"></div><div class="c br"></div>
+
+<!-- TOP BUTTONS: BACK · CALIBRATE · RESET -->
 <div id="top-bar">
-    <button class="cmd-btn" ontouchstart="tapBtn(this,'BACK')"   onclick="sendCmd('BACK')">
-        <span class="btn-icon">←</span><span class="btn-label">BACK</span>
+    <button class="top-btn" ontouchstart="tapBtn(this,'BACK')"   onclick="sendCmd('BACK')">
+        <span class="ti">←</span><span class="tl">BACK</span>
     </button>
-    <button class="cmd-btn" ontouchstart="tapBtn(this,'RESET')"  onclick="sendCmd('RESET')">
-        <span class="btn-icon">⊙</span><span class="btn-label">RESET</span>
+    <button class="top-btn" ontouchstart="tapBtn(this,'_CAL')"   onclick="calibrateGyro()">
+        <span class="ti">⊕</span><span class="tl">CALIBRATE</span>
     </button>
-    <button class="cmd-btn" ontouchstart="tapBtn(this,'ACTION')" onclick="sendCmd('ACTION')">
-        <span class="btn-icon">◈</span><span class="btn-label">ACTION</span>
+    <button class="top-btn" ontouchstart="tapBtn(this,'RESET')"  onclick="sendCmd('RESET')">
+        <span class="ti">⊙</span><span class="tl">RESET</span>
     </button>
 </div>
 
-<div id="status-bar">
-    <div id="status-dot"></div>
-    <div id="status-text">SEARCHING</div>
+<!-- STATUS -->
+<div id="status-row">
+    <div id="sdot"></div>
+    <div id="stxt">SEARCHING</div>
 </div>
 
-<div id="main-area">
-    <div id="left-panel">
-        <div id="joy-zone"></div>
-        <div id="move-label">MOVE</div>
+<!-- ACTION BUTTON -->
+<div id="action-zone">
+    <button id="action-btn" ontouchstart="tapBtn(this,'ACTION')" onclick="sendCmd('ACTION')">
+        <div class="action-hline"></div>
+        <div class="action-vline"></div>
+        <span id="action-icon">◈</span>
+        <span id="action-label">ACTION</span>
+    </button>
+</div>
+
+<!-- GYRO STRIP -->
+<div id="gyro-strip">
+    <span id="gyro-label">LOOK</span>
+    <div id="gyro-bar-container">
+        <div id="gyro-bar-center"></div>
+        <div id="gyro-bar-x"></div>
     </div>
-    <div id="right-panel">
-        <div class="gyro-section-label">LOOK</div>
-        <div id="gyro-ring"><div id="gyro-dot"></div></div>
-        <div id="gyro-status">AWAITING</div>
-        <button id="gyro-cal" onclick="calibrateGyro()">RECALIBRATE</button>
-    </div>
+    <span id="gyro-stat">AWAITING</span>
+    <button id="cal-btn" onclick="calibrateGyro()">RECAL</button>
 </div>
 
+<!-- JOYSTICK -->
+<div id="joy-area">
+    <div id="joy-zone"></div>
+    <div id="move-label">MOVE</div>
+</div>
+
+<!-- GYRO PERMISSION -->
 <div id="gyro-overlay">
-    <div class="ol-title">MOTION ACCESS</div>
-    <div class="ol-desc">This controller uses your device<br>gyroscope to rotate the camera.<br>Tap to allow motion sensor access.</div>
+    <div class="ov-title">MOTION ACCESS</div>
+    <div class="ov-body">This controller uses the device gyroscope<br>to rotate the camera. Tap to allow.</div>
     <button id="allow-btn" onclick="requestGyro()">ALLOW MOTION</button>
 </div>
 
 <script>
 // ── PARTICLES ─────────────────────────────────────────────────────────────
-const canvas = document.getElementById('energy-canvas');
-const ctx = canvas.getContext('2d');
-let particles = [], pts = {}, t = 0;
+const ec = document.getElementById('ec');
+const ctx = ec.getContext('2d');
+let particles = [], pts = {}, aT = 0;
+
 class P {
-    constructor(tx,ty){const a=Math.random()*Math.PI*2,r=40+Math.random()*60;this.x=tx+Math.cos(a)*r;this.y=ty+Math.sin(a)*r;this.tx=tx;this.ty=ty;this.sz=Math.random()*0.18+0.06;this.spd=0.01+Math.random()*0.013;this.life=1;this.n=Math.random()*1000;}
-    update(){this.x+=(this.tx-this.x)*this.spd+Math.sin(t*3+this.n)*0.35;this.y+=(this.ty-this.y)*this.spd+Math.cos(t*3+this.n)*0.35;this.life-=0.02;}
-    draw(){const op=this.life*0.28,bs=this.sz*38;const g=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,bs);g.addColorStop(0,`rgba(255,255,255,${op})`);g.addColorStop(0.2,`rgba(255,255,255,${op*0.04})`);g.addColorStop(1,'rgba(255,255,255,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(this.x,this.y,bs,0,Math.PI*2);ctx.fill();}
+    constructor(tx,ty){
+        const a=Math.random()*Math.PI*2, r=30+Math.random()*50;
+        this.x=tx+Math.cos(a)*r; this.y=ty+Math.sin(a)*r;
+        this.tx=tx; this.ty=ty;
+        this.sz=Math.random()*0.15+0.05; this.spd=0.01+Math.random()*0.012;
+        this.life=1; this.n=Math.random()*1000;
+    }
+    update(){ this.x+=(this.tx-this.x)*this.spd+Math.sin(aT*3+this.n)*0.3; this.y+=(this.ty-this.y)*this.spd+Math.cos(aT*3+this.n)*0.3; this.life-=0.022; }
+    draw(){ const op=this.life*0.25, bs=this.sz*35; const g=ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,bs); g.addColorStop(0,`rgba(255,255,255,${op})`); g.addColorStop(0.25,`rgba(255,255,255,${op*0.04})`); g.addColorStop(1,'rgba(255,255,255,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(this.x,this.y,bs,0,Math.PI*2); ctx.fill(); }
 }
-function loop(){t+=0.01;ctx.fillStyle='#000';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.globalCompositeOperation='lighter';Object.values(pts).forEach(p=>{if(p)for(let i=0;i<3;i++)particles.push(new P(p.x,p.y));});for(let i=particles.length-1;i>=0;i--){particles[i].update();particles[i].draw();if(particles[i].life<=0)particles.splice(i,1);}ctx.globalCompositeOperation='source-over';requestAnimationFrame(loop);}
-function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-window.addEventListener('resize',resize);resize();loop();
+function anim(){ aT+=0.01; ctx.fillStyle='#000'; ctx.fillRect(0,0,ec.width,ec.height); ctx.globalCompositeOperation='lighter'; Object.values(pts).forEach(p=>{if(p)for(let i=0;i<2;i++)particles.push(new P(p.x,p.y));}); for(let i=particles.length-1;i>=0;i--){particles[i].update();particles[i].draw();if(particles[i].life<=0)particles.splice(i,1);} ctx.globalCompositeOperation='source-over'; requestAnimationFrame(anim); }
+function rsz(){ ec.width=window.innerWidth; ec.height=window.innerHeight; }
+window.addEventListener('resize',rsz); rsz(); anim();
 
 // ── STATUS ────────────────────────────────────────────────────────────────
-const statusDot=document.getElementById('status-dot');
-const statusTxt=document.getElementById('status-text');
-function setStatus(cls,lbl){statusDot.className=cls;statusTxt.textContent=lbl;}
+const sdot=document.getElementById('sdot'), stxt=document.getElementById('stxt');
+function setStatus(cls,lbl){ sdot.className=cls; stxt.textContent=lbl; }
 
 // ── PEERJS ────────────────────────────────────────────────────────────────
-try{localStorage.setItem('__t__','1');localStorage.removeItem('__t__');}
-catch(e){const m={};Object.defineProperty(window,'localStorage',{value:{getItem:k=>m[k]??null,setItem:(k,v)=>{m[k]=v;},removeItem:k=>delete m[k],clear:()=>Object.keys(m).forEach(k=>delete m[k])}});}
+try{ localStorage.setItem('__t__','1'); localStorage.removeItem('__t__'); }
+catch(e){ const m={}; Object.defineProperty(window,'localStorage',{value:{getItem:k=>m[k]??null,setItem:(k,v)=>{m[k]=v;},removeItem:k=>delete m[k],clear:()=>Object.keys(m).forEach(k=>delete m[k])}}); }
 
 const desktopId = new URLSearchParams(window.location.search).get('id');
 let conn;
-const peer = new Peer({config:{iceServers:[
+const peer = new Peer({ config:{ iceServers:[
     {urls:'stun:stun.l.google.com:19302'},
     {urls:'stun:stun1.l.google.com:19302'},
     {urls:'stun:stun.cloudflare.com:3478'}
 ]}});
 peer.on('open',()=>{
-    if(!desktopId){setStatus('','NO_ID');return;}
+    if(!desktopId){ setStatus('','NO_ID'); return; }
     setStatus('linking','LINKING');
-    conn=peer.connect(desktopId,{serialization:'json',reliable:true});
-    conn.on('open',()=>setStatus('linked','LINKED'));
-    conn.on('close',()=>{setStatus('','LOST');conn=null;});
+    conn = peer.connect(desktopId,{serialization:'json',reliable:true});
+    conn.on('open', ()=>setStatus('linked','LINKED'));
+    conn.on('close',()=>{ setStatus('','LOST'); conn=null; });
     conn.on('error',()=>setStatus('','ERROR'));
 });
-peer.on('error',(err)=>setStatus('',err.type||'ERR'));
+peer.on('error',(e)=>setStatus('',e.type||'ERR'));
 
-function send(data){if(conn&&conn.open)conn.send(data);}
-
+function send(d){ if(conn&&conn.open) conn.send(d); }
 function sendCmd(cmd){
+    if(cmd==='_CAL') return; // local only
     send({type:'BUTTON',action:cmd});
-    if(navigator.vibrate)navigator.vibrate(18);
+    if(navigator.vibrate) navigator.vibrate(16);
 }
 
 function tapBtn(el,cmd){
-    el.classList.add('pressed');
-    setTimeout(()=>el.classList.remove('pressed'),250);
-    sendCmd(cmd);
+    el.classList.add('flash');
+    setTimeout(()=>el.classList.remove('flash'),200);
+    if(cmd!=='_CAL') sendCmd(cmd);
 }
 
 // ── JOYSTICK ──────────────────────────────────────────────────────────────
 const joy = nipplejs.create({
     zone: document.getElementById('joy-zone'),
-    mode: 'static', size: 120,
-    position: { top: '50%', left: '50%' }
+    mode: 'static', size: 130,
+    position: { top: '45%', left: '50%' }
 });
 
 joy.on('move',(evt,data)=>{
     if(data.vector){
         const pos=data.instance.ui.front.getBoundingClientRect();
-        pts['JOY']={x:pos.left+pos.width/2,y:pos.top+pos.height/2};
-        // CORRECTED AXES:
-        // nipplejs up   → vector.y = +1 → should move camera FORWARD  → send y = +data.vector.y
-        // nipplejs right→ vector.x = +1 → should move camera RIGHT    → send x = +data.vector.x
-        send({type:'MOVE', x: data.vector.x, y: data.vector.y, force: data.force});
+        pts['JOY']={ x:pos.left+pos.width/2, y:pos.top+pos.height/2 };
+        // Correct axes: nipplejs up=+y → forward, right=+x → right
+        send({ type:'MOVE', x:data.vector.x, y:data.vector.y, force:data.force });
     }
 });
-joy.on('end',()=>{delete pts['JOY'];send({type:'MOVE',x:0,y:0,force:0});});
+joy.on('end',()=>{ delete pts['JOY']; send({type:'MOVE',x:0,y:0,force:0}); });
 
 // ── GYROSCOPE ─────────────────────────────────────────────────────────────
-const gyroRing   = document.getElementById('gyro-ring');
-const gyroDot    = document.getElementById('gyro-dot');
-const gyroStatus = document.getElementById('gyro-status');
+const gyroBarX = document.getElementById('gyro-bar-x');
+const gyroStat = document.getElementById('gyro-stat');
 
-let gyroLive = false, baseGamma = null, baseBeta = null;
-const SENS = 0.55, DEAD = 1.5;
-const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
+let gyroLive=false, baseG=null, baseB=null;
+const SENS=0.55, DEAD=1.5;
+const cl=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 function calibrateGyro(){
-    baseGamma=null; baseBeta=null;
-    gyroStatus.textContent='CALIBRATED'; gyroStatus.className='';
-    gyroRing.classList.remove('active');
-    if(navigator.vibrate)navigator.vibrate([15,40,15]);
+    baseG=null; baseB=null;
+    gyroStat.textContent='CALIBRATED'; gyroStat.className='';
+    if(navigator.vibrate) navigator.vibrate([12,35,12]);
+    // visual flash
+    const strip = document.getElementById('gyro-strip');
+    strip.style.borderBottomColor='rgba(255,255,255,0.4)';
+    setTimeout(()=>strip.style.borderBottomColor='',500);
 }
 
-function onOrientation(e){
-    const rg = e.gamma??0, rb = e.beta??0;
-    if(baseGamma===null){baseGamma=rg;baseBeta=rb;return;}
-    let dx=rg-baseGamma, dy=rb-baseBeta;
-    if(Math.abs(dx)<DEAD)dx=0;
-    if(Math.abs(dy)<DEAD)dy=0;
-    gyroDot.style.left=(50+clamp(dx,-40,40)/40*44)+'%';
-    gyroDot.style.top =(50+clamp(dy,-40,40)/40*44)+'%';
-    const moving=Math.abs(dx)>0||Math.abs(dy)>0;
-    gyroRing.classList.toggle('active',moving);
+function onOri(e){
+    const rg=e.gamma??0, rb=e.beta??0;
+    if(baseG===null){ baseG=rg; baseB=rb; return; }
+    let dx=rg-baseG, dy=rb-baseB;
+    if(Math.abs(dx)<DEAD) dx=0;
+    if(Math.abs(dy)<DEAD) dy=0;
+
+    // bar X position: 50% center ± offset based on horizontal tilt
+    const pct = 50 + cl(dx,-40,40)/40*45;
+    gyroBarX.style.left = pct+'%';
+
+    const moving = Math.abs(dx)>0||Math.abs(dy)>0;
     if(moving){
-        if(!gyroLive){gyroLive=true;gyroStatus.textContent='ACTIVE';gyroStatus.className='active';}
-        const rect=gyroRing.getBoundingClientRect();
-        pts['GYRO']={x:rect.left+rect.width/2,y:rect.top+rect.height/2};
-        send({type:'ROTATE', x:clamp(dx/40,-1,1)*SENS, y:clamp(dy/40,-1,1)*SENS, force:1});
+        if(!gyroLive){ gyroLive=true; gyroStat.textContent='ACTIVE'; gyroStat.className='live'; }
+        const rect=document.getElementById('gyro-strip').getBoundingClientRect();
+        pts['GYRO']={ x:rect.left+rect.width/2, y:rect.top+rect.height/2 };
+        send({ type:'ROTATE', x:cl(dx/40,-1,1)*SENS, y:cl(dy/40,-1,1)*SENS, force:1 });
     } else {
         delete pts['GYRO'];
-        send({type:'ROTATE',x:0,y:0,force:0});
+        send({ type:'ROTATE', x:0, y:0, force:0 });
     }
 }
 
 // ── GYRO PERMISSION ───────────────────────────────────────────────────────
-const gyroOverlay = document.getElementById('gyro-overlay');
-function startGyro(){window.addEventListener('deviceorientation',onOrientation,true);gyroStatus.textContent='READY';}
+const gyroOv = document.getElementById('gyro-overlay');
+function startGyro(){ window.addEventListener('deviceorientation',onOri,true); gyroStat.textContent='READY'; }
 function requestGyro(){
     if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){
         DeviceOrientationEvent.requestPermission()
-            .then(s=>{gyroOverlay.classList.add('hidden');if(s==='granted')startGyro();else gyroStatus.textContent='DENIED';})
-            .catch(()=>{gyroOverlay.classList.add('hidden');gyroStatus.textContent='ERROR';});
-    } else {gyroOverlay.classList.add('hidden');startGyro();}
+            .then(s=>{ gyroOv.classList.add('hidden'); if(s==='granted') startGyro(); else gyroStat.textContent='DENIED'; })
+            .catch(()=>{ gyroOv.classList.add('hidden'); gyroStat.textContent='ERROR'; });
+    } else { gyroOv.classList.add('hidden'); startGyro(); }
 }
+// Auto-start on Android / non-iOS
 if(typeof DeviceOrientationEvent==='undefined'||typeof DeviceOrientationEvent.requestPermission!=='function'){
-    gyroOverlay.classList.add('hidden');startGyro();
+    gyroOv.classList.add('hidden'); startGyro();
 }
 </script>
 </body>
